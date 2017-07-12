@@ -30,6 +30,10 @@ void add_history(char* unused) {}
 #endif
 
 
+long eval(mpc_ast_t*);
+long eval_op(long, char*, long);
+
+
 int main(int argc, char** argv) {
 
   /* Create some parsers */
@@ -41,7 +45,7 @@ int main(int argc, char** argv) {
   /* Define them with the following language */
   mpca_lang(
     MPCA_LANG_DEFAULT,
-    "                                                     \
+    "                                                   \
     number   : /-?[0-9]+/ ;                             \
     operator : '+' | '-' | '*' | '/' ;                  \
     expr     : <number> | '(' <operator> <expr>+ ')' ;  \
@@ -69,6 +73,10 @@ int main(int argc, char** argv) {
     if (mpc_parse("<stdin>", input, Lispc, &r)) {
       /* On success, print the AST */
       mpc_ast_print(r.output);
+
+      long ret = eval(r.output);
+      printf("eval: %li\n", ret);
+
       mpc_ast_delete(r.output);
     } else {
       /* otherwise, print the error */
@@ -84,5 +92,35 @@ int main(int argc, char** argv) {
   /* Undefine and Delete our Parsers */
   mpc_cleanup(4, Number, Operator, Expr, Lispc);
 
+  return 0;
+}
+
+long eval(mpc_ast_t* tree) {
+
+  /* If tagged as number return it directly. */
+  if (strstr(tree->tag, "number")) {
+    return atoi(tree->contents);
+  }
+
+  /* The operator is always second child. */
+  char* op = tree->children[1]->contents;
+
+  /* We store the third child in `x` */
+  long acc = eval(tree->children[2]);
+
+  /* Iterate the remaining children and combining. */
+  for (int i = 3; strstr(tree->children[i]->tag, "expr"); ++i) {
+    acc = eval_op(acc, op, eval(tree->children[i]));
+  }
+
+  return acc;
+}
+
+/* Use operator string to see which operation to perform */
+long eval_op(long x, char* op, long y) {
+  if (strcmp(op, "+") == 0) { return x + y; }
+  if (strcmp(op, "-") == 0) { return x - y; }
+  if (strcmp(op, "*") == 0) { return x * y; }
+  if (strcmp(op, "/") == 0) { return x / y; }
   return 0;
 }
