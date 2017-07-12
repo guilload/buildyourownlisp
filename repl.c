@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "lval.h"
 #include "mpc.h"
 
 
@@ -30,8 +31,8 @@ void add_history(char* unused) {}
 #endif
 
 
-long eval(mpc_ast_t*);
-long eval_op(long, char*, long);
+lval eval(mpc_ast_t*);
+lval eval_op(lval, char*, lval);
 
 
 int main(int argc, char** argv) {
@@ -74,8 +75,8 @@ int main(int argc, char** argv) {
       /* On success, print the AST */
       mpc_ast_print(r.output);
 
-      long ret = eval(r.output);
-      printf("eval: %li\n", ret);
+      lval value = eval(r.output);
+      lval_println(value);
 
       mpc_ast_delete(r.output);
     } else {
@@ -95,20 +96,18 @@ int main(int argc, char** argv) {
   return 0;
 }
 
-long eval(mpc_ast_t* tree) {
+lval eval(mpc_ast_t* tree) {
 
-  /* If tagged as number return it directly. */
   if (strstr(tree->tag, "number")) {
-    return atoi(tree->contents);
+    /* Check if there is some error in conversion */
+    errno = 0;
+    long acc = strtol(tree->contents, NULL, 10);
+    return errno != ERANGE ? lval_num(acc) : lval_err(LERR_BAD_NUM);
   }
 
-  /* The operator is always second child. */
   char* op = tree->children[1]->contents;
+  lval acc = eval(tree->children[2]);
 
-  /* We store the third child in `x` */
-  long acc = eval(tree->children[2]);
-
-  /* Iterate the remaining children and combining. */
   for (int i = 3; strstr(tree->children[i]->tag, "expr"); ++i) {
     acc = eval_op(acc, op, eval(tree->children[i]));
   }
@@ -117,10 +116,22 @@ long eval(mpc_ast_t* tree) {
 }
 
 /* Use operator string to see which operation to perform */
-long eval_op(long x, char* op, long y) {
-  if (strcmp(op, "+") == 0) { return x + y; }
-  if (strcmp(op, "-") == 0) { return x - y; }
-  if (strcmp(op, "*") == 0) { return x * y; }
-  if (strcmp(op, "/") == 0) { return x / y; }
-  return 0;
+lval eval_op(lval x, char* op, lval y) {
+
+  /* If either value is an error return it */
+  if (x.type == LVAL_ERR) { return x; }
+  if (y.type == LVAL_ERR) { return y; }
+
+  /* Otherwise do maths on the number values */
+  if (strcmp(op, "+") == 0) { return lval_num(x.num + y.num); }
+  if (strcmp(op, "-") == 0) { return lval_num(x.num - y.num); }
+  if (strcmp(op, "*") == 0) { return lval_num(x.num * y.num); }
+  if (strcmp(op, "/") == 0) {
+    /* If second operand is zero return error */
+    return y.num == 0
+      ? lval_err(LERR_DIV_ZERO)
+      : lval_num(x.num / y.num);
+  }
+
+  return lval_err(LERR_BAD_OP);
 }
