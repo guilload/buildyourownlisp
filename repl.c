@@ -45,20 +45,21 @@ int main(int argc, char** argv) {
   mpc_parser_t* Number = mpc_new("number");
   mpc_parser_t* Symbol = mpc_new("symbol");
   mpc_parser_t* Sexpr  = mpc_new("sexpr");
+  mpc_parser_t* Qexpr  = mpc_new("qexpr");
   mpc_parser_t* Expr   = mpc_new("expr");
   mpc_parser_t* Lispc  = mpc_new("lispc");
 
   /* define them with the following language */
   mpca_lang(MPCA_LANG_DEFAULT,
-    "                                          \
-      number : /-?[0-9]+/ ;                    \
-      symbol : '+' | '-' | '*' | '/' ;         \
-      sexpr  : '(' <expr>* ')' ;               \
-      expr   : <number> | <symbol> | <sexpr> ; \
-      lispc  : /^/ <expr>* /$/ ;               \
+    "                                                    \
+      number : /-?[0-9]+/ ;                              \
+      symbol : '+' | '-' | '*' | '/' ;                   \
+      sexpr  : '(' <expr>* ')' ;                         \
+      qexpr  : '{' <expr>* '}' ;                         \
+      expr   : <number> | <symbol> | <sexpr> | <qexpr> ; \
+      lispc  : /^/ <expr>* /$/ ;                         \
     ",
-    Number, Symbol, Sexpr, Expr, Lispc
-  );
+    Number, Symbol, Sexpr, Qexpr, Expr, Lispc);
 
   /* print version and exit information */
   puts("Lispc Version 0.0.0.0.1");
@@ -95,7 +96,7 @@ int main(int argc, char** argv) {
   }
 
   /* undefine and delete our parsers */
-  mpc_cleanup(5, Number, Symbol, Sexpr, Expr, Lispc);
+  mpc_cleanup(6, Number, Symbol, Sexpr, Qexpr, Expr, Lispc);
 
   return 0;
 }
@@ -124,6 +125,10 @@ lval* lval_read(mpc_ast_t* tree) {
     acc = lval_sexpr();
   }
 
+  if (strstr(tree->tag, "qexpr"))  {
+    acc = lval_qexpr();
+  }
+
   if (strstr(tree->tag, "sexpr"))  {
     acc = lval_sexpr();
   }
@@ -132,6 +137,8 @@ lval* lval_read(mpc_ast_t* tree) {
   for (int i = 0; i < tree->children_num; i++) {
     if (strcmp(tree->children[i]->contents, "(") == 0) { continue; }
     if (strcmp(tree->children[i]->contents, ")") == 0) { continue; }
+    if (strcmp(tree->children[i]->contents, "{") == 0) { continue; }
+    if (strcmp(tree->children[i]->contents, "}") == 0) { continue; }
     if (strcmp(tree->children[i]->tag,  "regex") == 0) { continue; }
 
     acc = lval_add(acc, lval_read(tree->children[i]));

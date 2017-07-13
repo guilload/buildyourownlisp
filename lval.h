@@ -5,6 +5,7 @@
 enum {
   LVAL_ERR,
   LVAL_NUM,
+  LVAL_QEXPR,
   LVAL_SEXPR,
   LVAL_SYM,
 };
@@ -25,6 +26,7 @@ typedef struct lval {
 
 lval* lval_err(char*);
 lval* lval_num(long);
+lval* lval_qexpr(void);
 lval* lval_sexpr(void);
 lval* lval_sym(char*);
 

@@ -14,6 +14,15 @@ lval* lval_err(char* message) {
   return lv;
 }
 
+/* construct a pointer to a new empty Qexpr lval */
+lval* lval_qexpr(void) {
+  lval* lv = malloc(sizeof(lval));
+  lv->type = LVAL_QEXPR;
+  lv->length = 0;
+  lv->cell = NULL;
+  return lv;
+}
+
 /* construct a pointer to a new Number lval */
 lval* lval_num(long num) {
   lval* lv = malloc(sizeof(lval));
@@ -59,7 +68,8 @@ void lval_del(lval* lv) {
     case LVAL_ERR: free(lv->err); break;
     case LVAL_SYM: free(lv->sym); break;
 
-    /* if Sexpr then delete all elements inside */
+    /* if Qexpr or Sexpr then delete all elements inside */
+    case LVAL_QEXPR:
     case LVAL_SEXPR:
       for (int i = 0; i < lv->length; i++) {
         lval_del(lv->cell[i]);
@@ -104,6 +114,10 @@ void lval_print(lval* lv) {
 
     case LVAL_SYM:
       printf("%s", lv->sym);
+      break;
+
+    case LVAL_QEXPR:
+      lval_expr_print(lv, '{', '}');
       break;
 
     case LVAL_SEXPR:
