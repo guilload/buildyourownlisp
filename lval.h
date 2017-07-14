@@ -24,13 +24,14 @@ typedef struct lval {
   struct lval** cell;
 } lval;
 
+lval* lval_add(lval*, lval*);
 lval* lval_err(char*);
+lval* lval_join(lval*, lval*);
 lval* lval_num(long);
 lval* lval_qexpr(void);
 lval* lval_sexpr(void);
 lval* lval_sym(char*);
 
-lval* lval_add(lval*, lval*);
 void lval_del(lval*);
 void lval_expr_print(lval*, char, char);
 void lval_print(lval*);

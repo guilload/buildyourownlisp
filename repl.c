@@ -2,13 +2,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "builtins.h"
 #include "lval.h"
 #include "mpc.h"
 
 
 /* if we are compiling on Windows compile these functions */
 #ifdef _WIN32
-#include <string.h>
 
 static char buffer[2048];
 
@@ -31,7 +31,6 @@ void add_history(char* unused) {}
 #endif
 
 
-lval* builtin_op(lval*, char*);
 lval* lval_eval(lval*);
 lval* lval_pop(lval*, int);
 lval* lval_read(mpc_ast_t*);
@@ -51,15 +50,17 @@ int main(int argc, char** argv) {
 
   /* define them with the following language */
   mpca_lang(MPCA_LANG_DEFAULT,
-    "                                                    \
-      number : /-?[0-9]+/ ;                              \
-      symbol : '+' | '-' | '*' | '/' ;                   \
-      sexpr  : '(' <expr>* ')' ;                         \
-      qexpr  : '{' <expr>* '}' ;                         \
-      expr   : <number> | <symbol> | <sexpr> | <qexpr> ; \
-      lispc  : /^/ <expr>* /$/ ;                         \
+    "                                                        \
+      number : /-?[0-9]+/ ;                                  \
+      symbol : \"list\" | \"head\" | \"tail\"                \
+             | \"join\" | \"eval\" | '+' | '-' | '*' | '/' ; \
+      sexpr  : '(' <expr>* ')' ;                             \
+      qexpr  : '{' <expr>* '}' ;                             \
+      expr   : <number> | <symbol> | <sexpr> | <qexpr> ;     \
+      lispc  : /^/ <expr>* /$/ ;                             \
     ",
-    Number, Symbol, Sexpr, Qexpr, Expr, Lispc);
+    Number, Symbol, Sexpr, Qexpr, Expr, Lispc
+  );
 
   /* print version and exit information */
   puts("Lispc Version 0.0.0.0.1");
@@ -78,10 +79,10 @@ int main(int argc, char** argv) {
     mpc_result_t r;
 
     if (mpc_parse("<stdin>", input, Lispc, &r)) {
-
-      lval* x = lval_eval(lval_read(r.output));
-      lval_println(x);
-      lval_del(x);
+      lval* x = lval_read(r.output);
+      lval* y = lval_eval(x);
+      lval_println(y);
+      lval_del(y);
 
       mpc_ast_delete(r.output);
     } else {
@@ -139,7 +140,7 @@ lval* lval_read(mpc_ast_t* tree) {
     if (strcmp(tree->children[i]->contents, ")") == 0) { continue; }
     if (strcmp(tree->children[i]->contents, "{") == 0) { continue; }
     if (strcmp(tree->children[i]->contents, "}") == 0) { continue; }
-    if (strcmp(tree->children[i]->tag,  "regex") == 0) { continue; }
+    if (strcmp(tree->children[i]->tag, "regex") == 0) { continue; }
 
     acc = lval_add(acc, lval_read(tree->children[i]));
   }
@@ -180,7 +181,7 @@ lval* lval_eval_sexpr(lval* lv) {
   }
 
   /* call builtin with operator */
-  lval* acc = builtin_op(lv, first->sym);
+  lval* acc = builtin(lv, first->sym);
   lval_del(first);
 
   return acc;
@@ -215,50 +216,4 @@ lval* lval_take(lval* lv, int i) {
   lval* x = lval_pop(lv, i);
   lval_del(lv);
   return x;
-}
-
-lval* builtin_op(lval* lv, char* op) {
-
-  /* ensure all arguments are numbers */
-  for (int i = 0; i < lv->length; i++) {
-    if (lv->cell[i]->type != LVAL_NUM) {
-      lval_del(lv);
-      return lval_err("Cannot operate on non-number!");
-    }
-  }
-
-  /* pop the first element */
-  lval* acc = lval_pop(lv, 0);
-
-  /* if no arguments and sub then perform unary negation */
-  if ((strcmp(op, "-") == 0) && lv->length == 0) {
-    acc->num = -acc->num;
-  }
-
-  /* while there are still elements remaining */
-  while (lv->length > 0) {
-
-    /* pop the next element */
-    lval* current = lval_pop(lv, 0);
-
-    if (strcmp(op, "+") == 0) { acc->num += current->num; }
-    if (strcmp(op, "-") == 0) { acc->num -= current->num; }
-    if (strcmp(op, "*") == 0) { acc->num *= current->num; }
-    if (strcmp(op, "/") == 0) {
-
-      if (current->num == 0) {
-        lval_del(acc);
-        lval_del(current);
-        acc = lval_err("Division by zero!");
-        break;
-      }
-
-      acc->num /= current->num;
-    }
-
-    lval_del(current);
-  }
-
-  lval_del(lv);
-  return acc;
 }

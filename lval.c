@@ -5,6 +5,9 @@
 #include "lval.h"
 
 
+lval* lval_pop(lval*, int);
+
+
 /* construct a pointer to a new Error lval */
 lval* lval_err(char* message) {
   lval* lv = (lval*) malloc(sizeof(lval));
@@ -12,6 +15,17 @@ lval* lval_err(char* message) {
   lv->err = malloc(strlen(message) + 1);
   strcpy(lv->err, message);
   return lv;
+}
+
+lval* lval_join(lval* x, lval* y) {
+  /* for each cell in 'y' add it to 'x' */
+  while (y->length) {
+    x = lval_add(x, lval_pop(y, 0));
+  }
+
+  /* delete the empty 'y' and return 'x' */
+  lval_del(y);
+  return x;
 }
 
 /* construct a pointer to a new empty Qexpr lval */
