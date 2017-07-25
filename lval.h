@@ -1,12 +1,11 @@
 #ifndef LVAL_H_
 #define LVAL_H_
 
+#include "lenv.h"
+
 /* Forward declarations */
 struct lval;
 typedef struct lval lval;
-
-struct lenv;
-typedef struct lenv lenv;
 
 typedef lval*(*lbuiltin)(lenv*, lval*);
 
