@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include "builtins.h"
+#include "lenv.h"
 #include "lval.h"
 #include "mpc.h"
 
@@ -31,7 +32,9 @@ void add_history(char* unused) {}
 #endif
 
 
-lval* lval_eval(lval*);
+// FIXME!
+lval* lval_eval(lenv*, lval*);
+lval* lval_eval_sexpr(lenv*, lval*);
 lval* lval_pop(lval*, int);
 lval* lval_read(mpc_ast_t*);
 lval* lval_read_num(mpc_ast_t*);
@@ -65,6 +68,8 @@ int main(int argc, char** argv) {
   puts("Lispc Version 0.0.0.0.1");
   puts("Press Ctrl+c to Exit\n");
 
+  lenv* le = lenv_new();
+
   /* in a never ending loop */
   while (true) {
 
@@ -79,7 +84,7 @@ int main(int argc, char** argv) {
 
     if (mpc_parse("<stdin>", input, Lispc, &r)) {
       lval* x = lval_read(r.output);
-      lval* y = lval_eval(x);
+      lval* y = lval_eval(le, x);
       lval_println(y);
       lval_del(y);
 
@@ -147,10 +152,11 @@ lval* lval_read(mpc_ast_t* tree) {
   return acc;
 }
 
-lval* lval_eval_sexpr(lval* lv) {
+lval* lval_eval_sexpr(lenv* le, lval* lv) {
+
   /* evaluate children */
   for (int i = 0; i < lv->length; i++) {
-    lv->cell[i] = lval_eval(lv->cell[i]);
+    lv->cell[i] = lval_eval(le, lv->cell[i]);
   }
 
   /* error checking */
@@ -170,26 +176,32 @@ lval* lval_eval_sexpr(lval* lv) {
     return lval_take(lv, 0);
   }
 
-  /* ensure first element is Symbol */
-  lval* first = lval_pop(lv, 0);
+  /* ensure first element is a function after evaluation */
+  lval* func = lval_pop(lv, 0);
 
-  if (first->type != LVAL_SYM) {
-    lval_del(first);
+  if (func->type != LVAL_FUNC) {
     lval_del(lv);
-    return lval_err("S-expression does not start with symbol!");
+    lval_del(func);
+    return lval_err("first element is not a function");
   }
 
-  /* call builtin with operator */
-  lval* acc = builtin(lv, first->sym);
-  lval_del(first);
-
+  /* if so call function to get result */
+  lval* acc = func->func(le, lv);
+  lval_del(func);
   return acc;
 }
 
-lval* lval_eval(lval* lv) {
+lval* lval_eval(lenv* le, lval* lv) {
+  /* evaluate symbols */
+  if (lv->type == LVAL_SYM) {
+    lval* sym = lenv_get(le, lv);
+    lval_del(lv);
+    return sym;
+  }
+
   /* evaluate S-expressions */
   if (lv->type == LVAL_SEXPR) {
-    return lval_eval_sexpr(lv);
+    return lval_eval_sexpr(le, lv);
   }
 
   /* all other lval types remain the same */

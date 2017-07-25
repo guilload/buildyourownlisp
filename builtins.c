@@ -4,7 +4,7 @@
 #include "lval.h"
 
 
-lval* lval_eval(lval*);
+lval* lval_eval(lenv*, lval*);
 lval* lval_pop(lval*, int);
 lval* lval_take(lval*, int);
 
@@ -32,7 +32,7 @@ lval* builtin_eval(lval* lv) {
 
   lval* x = lval_take(lv, 0);
   x->type = LVAL_SEXPR;
-  return lval_eval(x);
+  return lval_eval(le, x);
 }
 
 lval* builtin_head(lval* lv) {
