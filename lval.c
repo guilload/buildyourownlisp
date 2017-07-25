@@ -8,6 +8,50 @@
 lval* lval_pop(lval*, int);
 
 
+/* copy a lval */
+lval* lval_copy(lval* lv) {
+
+  lval* copy = malloc(sizeof(lval));
+  copy->type = lv->type;
+
+  switch (lv->type) {
+
+    /* Copy functions and numbers directly */
+    case LVAL_FUNC:
+      copy->func = lv->func;
+      break;
+
+    case LVAL_NUM:
+      copy->num = lv->num;
+      break;
+
+    /* Copy strings using malloc and strcpy */
+    case LVAL_ERR:
+      copy->err = malloc(strlen(lv->err) + 1);
+      strcpy(copy->err, lv->err);
+      break;
+
+    case LVAL_SYM:
+      copy->sym = malloc(strlen(lv->sym) + 1);
+      strcpy(copy->sym, lv->sym);
+      break;
+
+    /* Copy lists by copying each sub-expression recursively */
+    case LVAL_SEXPR:
+    case LVAL_QEXPR:
+      copy->length = lv->length;
+      copy->cell = malloc(sizeof(lval*) * copy->length);
+
+      for (int i = 0; i < copy->length; i++) {
+        copy->cell[i] = lval_copy(lv->cell[i]);
+      }
+
+      break;
+  }
+
+  return copy;
+}
+
 /* construct a pointer to a new Error lval */
 lval* lval_err(char* message) {
   lval* lv = (lval*) malloc(sizeof(lval));

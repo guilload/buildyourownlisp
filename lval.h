@@ -40,6 +40,7 @@ enum {
 
 
 lval* lval_add(lval*, lval*);
+lval* lval_copy(lval*);
 lval* lval_err(char*);
 lval* lval_func(lbuiltin);
 lval* lval_join(lval*, lval*);
