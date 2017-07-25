@@ -17,6 +17,14 @@ lval* lval_err(char* message) {
   return lv;
 }
 
+/* construct a pointer to a new Func lval */
+lval* lval_func(lbuiltin func) {
+  lval* lv = malloc(sizeof(lval));
+  lv->type = LVAL_FUNC;
+  lv->func = func;
+  return lv;
+}
+
 lval* lval_join(lval* x, lval* y) {
   /* for each cell in 'y' add it to 'x' */
   while (y->length) {
@@ -75,7 +83,8 @@ lval* lval_add(lval* this, lval* that) {
 void lval_del(lval* lv) {
 
   switch (lv->type) {
-    /* do nothing special for number type */
+    /* do nothing special for func and number type */
+    case LVAL_FUNC:
     case LVAL_NUM: break;
 
     /* for Err or Sym free the string data */
@@ -118,16 +127,16 @@ void lval_expr_print(lval* lv, char open, char close) {
 void lval_print(lval* lv) {
   switch (lv->type) {
 
-    case LVAL_NUM:
-      printf("%li", lv->num);
-      break;
-
     case LVAL_ERR:
       printf("Error: %s", lv->err);
       break;
 
-    case LVAL_SYM:
-      printf("%s", lv->sym);
+    case LVAL_FUNC:
+      printf("<function>");
+      break;
+
+    case LVAL_NUM:
+      printf("%li", lv->num);
       break;
 
     case LVAL_QEXPR:
@@ -136,6 +145,10 @@ void lval_print(lval* lv) {
 
     case LVAL_SEXPR:
       lval_expr_print(lv, '(', ')');
+      break;
+
+    case LVAL_SYM:
+      printf("%s", lv->sym);
       break;
   }
 }

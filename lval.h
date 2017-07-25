@@ -1,31 +1,47 @@
 #ifndef LVAL_H_
 #define LVAL_H_
 
-/* create enumeration of possible lval types */
-enum {
-  LVAL_ERR,
-  LVAL_NUM,
-  LVAL_QEXPR,
-  LVAL_SEXPR,
-  LVAL_SYM,
-};
+/* Forward declarations */
+struct lval;
+typedef struct lval lval;
+
+struct lenv;
+typedef struct lenv lenv;
+
+typedef lval*(*lbuiltin)(lenv*, lval*);
 
 /* declare new lval struct */
-typedef struct lval {
+struct lval {
   int type;
+
   long num;
 
   /* error and symbol types have some string data */
   char* err;
   char* sym;
 
+  lbuiltin func;
+
   /* length and pointer to a list of "lval*" */
   int length;
   struct lval** cell;
-} lval;
+};
+
+
+/* create enumeration of possible lval types */
+enum {
+  LVAL_ERR,
+  LVAL_FUNC,
+  LVAL_NUM,
+  LVAL_QEXPR,
+  LVAL_SEXPR,
+  LVAL_SYM,
+};
+
 
 lval* lval_add(lval*, lval*);
 lval* lval_err(char*);
+lval* lval_func(lbuiltin);
 lval* lval_join(lval*, lval*);
 lval* lval_num(long);
 lval* lval_qexpr(void);
