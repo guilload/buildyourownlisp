@@ -69,6 +69,7 @@ int main(int argc, char** argv) {
   puts("Press Ctrl+c to Exit\n");
 
   lenv* le = lenv_new();
+  lenv_add_builtins(le);
 
   /* in a never ending loop */
   while (true) {

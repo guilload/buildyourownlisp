@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include "builtins.h"
+#include "lenv.h"
 #include "lval.h"
 
 
@@ -12,19 +13,15 @@ lval* lval_take(lval*, int);
   if (!(cond)) { lval_del(args); return lval_err(err); }
 
 
-lval* builtin(lval* lv, char* func) {
-  if (strcmp("eval", func) == 0) { return builtin_eval(lv); }
-  if (strcmp("head", func) == 0) { return builtin_head(lv); }
-  if (strcmp("join", func) == 0) { return builtin_join(lv); }
-  if (strcmp("list", func) == 0) { return builtin_list(lv); }
-  if (strcmp("tail", func) == 0) { return builtin_tail(lv); }
-  if (strstr("+-/*", func)) { return builtin_op(lv, func); }
-
-  lval_del(lv);
-  return lval_err("Unknown Function!");
+lval* builtin_add(lenv* le, lval* lv) {
+  return builtin_op(le, lv, "+");
 }
 
-lval* builtin_eval(lval* lv) {
+lval* builtin_div(lenv* le, lval* lv) {
+  return builtin_op(le, lv, "/");
+}
+
+lval* builtin_eval(lenv* le, lval* lv) {
   LASSERT(lv, lv->length == 1,
     "Function 'eval' passed too many arguments!");
   LASSERT(lv, lv->cell[0]->type == LVAL_QEXPR,
@@ -35,7 +32,7 @@ lval* builtin_eval(lval* lv) {
   return lval_eval(le, x);
 }
 
-lval* builtin_head(lval* lv) {
+lval* builtin_head(lenv* le, lval* lv) {
   LASSERT(lv, lv->length == 1,
     "Function 'head' passed too many arguments!");
   LASSERT(lv, lv->cell[0]->type == LVAL_QEXPR,
@@ -52,7 +49,7 @@ lval* builtin_head(lval* lv) {
   return head;
 }
 
-lval* builtin_join(lval* lv) {
+lval* builtin_join(lenv* le, lval* lv) {
   for (int i = 0; i < lv->length; i++) {
     LASSERT(lv, lv->cell[i]->type == LVAL_QEXPR,
       "Function 'join' passed incorrect type.");
@@ -68,12 +65,16 @@ lval* builtin_join(lval* lv) {
   return acc;
 }
 
-lval* builtin_list(lval* lv) {
+lval* builtin_list(lenv* le, lval* lv) {
   lv->type = LVAL_QEXPR;
   return lv;
 }
 
-lval* builtin_op(lval* lv, char* op) {
+lval* builtin_mul(lenv* le, lval* lv) {
+  return builtin_op(le, lv, "*");
+}
+
+lval* builtin_op(lenv* le, lval* lv, char* op) {
 
   /* ensure all arguments are numbers */
   for (int i = 0; i < lv->length; i++) {
@@ -119,7 +120,11 @@ lval* builtin_op(lval* lv, char* op) {
   return acc;
 }
 
-lval* builtin_tail(lval* lv) {
+lval* builtin_sub(lenv* le, lval* lv) {
+  return builtin_op(le, lv, "-");
+}
+
+lval* builtin_tail(lenv* le, lval* lv) {
   LASSERT(lv, lv->length == 1,
     "Function 'tail' passed too many arguments!");
   LASSERT(lv, lv->cell[0]->type == LVAL_QEXPR,
@@ -130,4 +135,29 @@ lval* builtin_tail(lval* lv) {
   lval* acc = lval_take(lv, 0);
   lval_del(lval_pop(acc, 0));
   return acc;
+}
+
+void lenv_add_builtin(lenv* le, char* name, lbuiltin func) {
+  lval* key = lval_sym(name);
+  lval* value = lval_func(func);
+
+  lenv_put(le, key, value);
+
+  lval_del(key);
+  lval_del(value);
+}
+
+void lenv_add_builtins(lenv* le) {
+  /* List Functions */
+  lenv_add_builtin(le, "eval", builtin_eval);
+  lenv_add_builtin(le, "head", builtin_head);
+  lenv_add_builtin(le, "join", builtin_join);
+  lenv_add_builtin(le, "list", builtin_list);
+  lenv_add_builtin(le, "tail", builtin_tail);
+
+  /* Mathematical Functions */
+  lenv_add_builtin(le, "+", builtin_add);
+  lenv_add_builtin(le, "/", builtin_div);
+  lenv_add_builtin(le, "*", builtin_mul);
+  lenv_add_builtin(le, "-", builtin_sub);
 }
