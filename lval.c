@@ -1,3 +1,4 @@
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,6 +8,31 @@
 
 lval* lval_pop(lval*, int);
 
+
+char* ltype_name(int type) {
+  switch(type) {
+    case LVAL_FUNC:
+      return "Function";
+
+    case LVAL_NUM:
+      return "Number";
+
+    case LVAL_ERR:
+      return "Error";
+
+    case LVAL_SYM:
+      return "Symbol";
+
+    case LVAL_SEXPR:
+      return "S-Expression";
+
+    case LVAL_QEXPR:
+      return "Q-Expression";
+
+    default:
+      return "Unknown";
+  }
+}
 
 /* copy a lval */
 lval* lval_copy(lval* lv) {
@@ -53,11 +79,26 @@ lval* lval_copy(lval* lv) {
 }
 
 /* construct a pointer to a new Error lval */
-lval* lval_err(char* message) {
-  lval* lv = (lval*) malloc(sizeof(lval));
+lval* lval_err(char* fmt, ...) {
+  lval* lv = malloc(sizeof(lval));
   lv->type = LVAL_ERR;
-  lv->err = malloc(strlen(message) + 1);
-  strcpy(lv->err, message);
+
+  /* Create a va list and initialize it */
+  va_list va;
+  va_start(va, fmt);
+
+  /* Allocate 512 bytes of space */
+  lv->err = malloc(512);
+
+  /* printf the error string with a maximum of 511 characters */
+  vsnprintf(lv->err, 511, fmt, va);
+
+  /* Reallocate to number of bytes actually used */
+  lv->err = realloc(lv->err, strlen(lv->err)+1);
+
+  /* Cleanup our va list */
+  va_end(va);
+
   return lv;
 }
 

@@ -28,7 +28,7 @@ lval* lenv_get(lenv* le, lval* key) {
   }
 
   /* if no symbol found, return error */
-  return lval_err("unbound symbol!");
+  return lval_err("Unbound Symbol '%s'", key->sym);
 }
 
 lenv* lenv_new(void) {
