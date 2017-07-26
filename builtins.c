@@ -17,6 +17,34 @@ lval* builtin_add(lenv* le, lval* lv) {
   return builtin_op(le, lv, "+");
 }
 
+lval* builtin_def(lenv* le, lval* lv) {
+  LASSERT(lv, lv->cell[0]->type == LVAL_QEXPR,
+    "Function 'def' passed incorrect type!");
+
+  /* first argument is symbol list */
+  lval* symbols = lv->cell[0];
+
+  /* ensure all elements of first list are symbols */
+  for (int i = 0; i < symbols->length; i++) {
+    LASSERT(lv, symbols->cell[i]->type == LVAL_SYM,
+      "Function 'def' cannot define non-symbol");
+  }
+
+  /* check correct number of symbols and values */
+  LASSERT(lv, symbols->length == lv->length-1,
+    "Function 'def' cannot define incorrect "
+    "number of values to symbols");
+
+  /* assign copies of values to symbols */
+  for (int i = 0; i < symbols->length; i++) {
+    lenv_put(le, symbols->cell[i], lv->cell[i + 1]);
+  }
+
+  lval_del(lv);
+  return lval_sexpr();
+}
+
+
 lval* builtin_div(lenv* le, lval* lv) {
   return builtin_op(le, lv, "/");
 }
@@ -148,16 +176,19 @@ void lenv_add_builtin(lenv* le, char* name, lbuiltin func) {
 }
 
 void lenv_add_builtins(lenv* le) {
-  /* List Functions */
+  /* List functions */
   lenv_add_builtin(le, "eval", builtin_eval);
   lenv_add_builtin(le, "head", builtin_head);
   lenv_add_builtin(le, "join", builtin_join);
   lenv_add_builtin(le, "list", builtin_list);
   lenv_add_builtin(le, "tail", builtin_tail);
 
-  /* Mathematical Functions */
+  /* Mathematical functions */
   lenv_add_builtin(le, "+", builtin_add);
   lenv_add_builtin(le, "/", builtin_div);
   lenv_add_builtin(le, "*", builtin_mul);
   lenv_add_builtin(le, "-", builtin_sub);
+
+  /* variable functions */
+  lenv_add_builtin(le, "def",  builtin_def);
 }

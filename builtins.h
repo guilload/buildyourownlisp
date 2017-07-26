@@ -6,6 +6,7 @@
 
 
 lval* builtin_add(lenv*, lval*);
+lval* builtin_def(lenv*, lval*);
 lval* builtin_div(lenv*, lval*);
 lval* builtin_eval(lenv*, lval*);
 lval* builtin_head(lenv*, lval*);
