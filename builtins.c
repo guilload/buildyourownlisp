@@ -36,37 +36,33 @@ lval* builtin_add(lenv* le, lval* lv) {
   return builtin_op(le, lv, "+");
 }
 
-lval* builtin_def(lenv* le, lval* lv) {
-  LASSERT_TYPE("def", lv, 0, LVAL_QEXPR);
-
-  /* first argument is symbol list */
-  lval* symbols = lv->cell[0];
-
-  /* ensure all elements of first list are symbols */
-  for (int i = 0; i < symbols->length; i++) {
-    LASSERT(lv, (symbols->cell[i]->type == LVAL_SYM),
-      "Function 'def' cannot define non-symbol. "
-      "Got %s, Expected %s.",
-      ltype_name(symbols->cell[i]->type), ltype_name(LVAL_SYM));
-  }
-
-  /* check correct number of symbols and values */
-  LASSERT(lv, symbols->length == lv->length - 1,
-    "Function 'def' cannot define incorrect "
-    "number of values to symbols");
-
-  /* assign copies of values to symbols */
-  for (int i = 0; i < symbols->length; i++) {
-    lenv_put(le, symbols->cell[i], lv->cell[i + 1]);
-  }
-
-  lval_del(lv);
-  return lval_sexpr();
+lval* builtin_def(lenv* le, lval* la) {
+  return builtin_var(le, la, "def");
 }
-
 
 lval* builtin_div(lenv* le, lval* lv) {
   return builtin_op(le, lv, "/");
+}
+
+lval* builtin_lambda(lenv* le, lval* la) {
+  /* check two arguments, each of which are Q-Expressions */
+  LASSERT_NUM("\\", la, 2);
+  LASSERT_TYPE("\\", la, 0, LVAL_QEXPR);
+  LASSERT_TYPE("\\", la, 1, LVAL_QEXPR);
+
+  /* check first Q-Expression contains only symbols */
+  for (int i = 0; i < la->cell[0]->length; i++) {
+    LASSERT(la, (la->cell[0]->cell[i]->type == LVAL_SYM),
+      "Cannot define non-symbol. Got %s, Expected %s.",
+      ltype_name(la->cell[0]->cell[i]->type), ltype_name(LVAL_SYM));
+  }
+
+  /* pop first two arguments and pass them to lval_lambda */
+  lval* args = lval_pop(la, 0);
+  lval* body = lval_pop(la, 0);
+  lval_del(la);
+
+  return lval_lambda(args, body);
 }
 
 lval* builtin_eval(lenv* le, lval* lv) {
@@ -159,6 +155,10 @@ lval* builtin_op(lenv* le, lval* lv, char* op) {
   return acc;
 }
 
+lval* builtin_put(lenv* le, lval* la) {
+  return builtin_var(le, la, "=");
+}
+
 lval* builtin_sub(lenv* le, lval* lv) {
   return builtin_op(le, lv, "-");
 }
@@ -171,6 +171,38 @@ lval* builtin_tail(lenv* le, lval* lv) {
   lval* acc = lval_take(lv, 0);
   lval_del(lval_pop(acc, 0));
   return acc;
+}
+
+lval* builtin_var(lenv* le, lval* la, char* func) {
+  LASSERT_TYPE(func, la, 0, LVAL_QEXPR);
+
+  lval* symbols = la->cell[0];
+
+  for (int i = 0; i < symbols->length; i++) {
+    LASSERT(la, (symbols->cell[i]->type == LVAL_SYM),
+      "Function '%s' cannot define non-symbol. "
+      "Got %s, Expected %s.", func,
+      ltype_name(symbols->cell[i]->type),
+      ltype_name(LVAL_SYM));
+  }
+
+  LASSERT(la, (symbols->length == la->length-1),
+    "Function '%s' passed too many arguments for symbols. "
+    "Got %i, Expected %i.", func, symbols->length, la->length - 1);
+
+  for (int i = 0; i < symbols->length; i++) {
+    /* If 'def' define in globally. If 'put' define in locally */
+    if (strcmp(func, "def") == 0) {
+      lenv_def(le, symbols->cell[i], la->cell[i + 1]);
+    }
+
+    if (strcmp(func, "=")   == 0) {
+      lenv_put(le, symbols->cell[i], la->cell[i + 1]);
+    }
+  }
+
+  lval_del(la);
+  return lval_sexpr();
 }
 
 void lenv_add_builtin(lenv* le, char* name, lbuiltin func) {
@@ -198,5 +230,7 @@ void lenv_add_builtins(lenv* le) {
   lenv_add_builtin(le, "-", builtin_sub);
 
   /* variable functions */
+  lenv_add_builtin(le, "=",   builtin_put);
+  lenv_add_builtin(le, "\\", builtin_lambda);
   lenv_add_builtin(le, "def",  builtin_def);
 }

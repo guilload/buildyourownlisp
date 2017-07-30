@@ -19,7 +19,11 @@ struct lval {
   char* err;
   char* sym;
 
-  lbuiltin func;
+  /* function */
+  lbuiltin builtin;
+  lenv* env;
+  lval* args;
+  lval* body;
 
   /* length and pointer to a list of "lval*" */
   int length;
@@ -40,10 +44,12 @@ enum {
 char* ltype_name(int);
 
 lval* lval_add(lval*, lval*);
+lval* lval_call(lenv*, lval*, lval*);
 lval* lval_copy(lval*);
 lval* lval_err(char*, ...);
 lval* lval_func(lbuiltin);
 lval* lval_join(lval*, lval*);
+lval* lval_lambda(lval*, lval*);
 lval* lval_num(long);
 lval* lval_qexpr(void);
 lval* lval_sexpr(void);

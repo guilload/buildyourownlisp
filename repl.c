@@ -194,7 +194,7 @@ lval* lval_eval_sexpr(lenv* le, lval* lv) {
   }
 
   /* if so call function to get result */
-  lval* acc = func->func(le, lv);
+  lval* acc = lval_call(le, func, lv);
   lval_del(func);
   return acc;
 }

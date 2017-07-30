@@ -6,6 +6,7 @@
 #include "lval.h"
 
 
+lval* builtin_eval(lenv*, lval*);
 lval* lval_pop(lval*, int);
 
 
@@ -34,6 +35,63 @@ char* ltype_name(int type) {
   }
 }
 
+/* call a function */
+lval* lval_call(lenv* le, lval* func, lval* la) {
+
+  /* if builtin then simply apply that */
+  if (func->builtin) {
+    return func->builtin(le, la);
+  }
+
+  /* record argument counts */
+  int provided = la->length;
+  int expected = func->args->length;
+
+  /* while arguments still remain to be processed */
+  while (la->length) {
+
+    /* if we've ran out of formal arguments to bind */
+    if (func->args->length == 0) {
+      lval_del(la);
+
+      return lval_err(
+        "Function passed too many arguments. "
+        "Got %i, Expected %i.", provided, expected
+      );
+    }
+
+    /* pop the first symbol from the args */
+    lval* symbol = lval_pop(func->args, 0);
+
+    /* pop the next argument from the list */
+    lval* value = lval_pop(la, 0);
+
+    /* bind a copy into the function's environment */
+    lenv_put(func->env, symbol, value);
+
+    /* Delete symbol and value */
+    lval_del(symbol);
+    lval_del(value);
+  }
+
+  /* Argument list is now bound so can be cleaned up */
+  lval_del(la);
+
+  /* If all args have been bound evaluate */
+  if (func->args->length == 0) {
+
+    /* Set environment parent to evaluation environment */
+    func->env->parent = le;
+
+    /* Evaluate and return */
+    return builtin_eval(
+      func->env, lval_add(lval_sexpr(), lval_copy(func->body)));
+  } else {
+    /* Otherwise return partially evaluated function */
+    return lval_copy(func);
+  }
+}
+
 /* copy a lval */
 lval* lval_copy(lval* lv) {
 
@@ -44,7 +102,14 @@ lval* lval_copy(lval* lv) {
 
     /* Copy functions and numbers directly */
     case LVAL_FUNC:
-      copy->func = lv->func;
+      if (lv->builtin) {
+        copy->builtin = lv->builtin;
+      } else {
+        copy->builtin = NULL;
+        copy->env = lenv_copy(lv->env);
+        copy->args = lval_copy(lv->args);
+        copy->body = lval_copy(lv->body);
+      }
       break;
 
     case LVAL_NUM:
@@ -106,7 +171,7 @@ lval* lval_err(char* fmt, ...) {
 lval* lval_func(lbuiltin func) {
   lval* lv = malloc(sizeof(lval));
   lv->type = LVAL_FUNC;
-  lv->func = func;
+  lv->builtin = func;
   return lv;
 }
 
@@ -119,6 +184,23 @@ lval* lval_join(lval* x, lval* y) {
   /* delete the empty 'y' and return 'x' */
   lval_del(y);
   return x;
+}
+
+lval* lval_lambda(lval* args, lval* body) {
+  lval* lv = malloc(sizeof(lval));
+  lv->type = LVAL_FUNC;
+
+  /* set func to null */
+  lv->builtin = NULL;
+
+  /* build new environment */
+  lv->env = lenv_new();
+
+  /* set args and body */
+  lv->args = args;
+  lv->body = body;
+
+  return lv;
 }
 
 /* construct a pointer to a new empty Qexpr lval */
@@ -170,6 +252,13 @@ void lval_del(lval* lv) {
   switch (lv->type) {
     /* do nothing special for func and number type */
     case LVAL_FUNC:
+      if (!lv->builtin) {
+        lenv_del(lv->env);
+        lval_del(lv->args);
+        lval_del(lv->body);
+      }
+      break;
+
     case LVAL_NUM: break;
 
     /* for Err or Sym free the string data */
@@ -217,7 +306,15 @@ void lval_print(lval* lv) {
       break;
 
     case LVAL_FUNC:
-      printf("<function>");
+      if (lv->builtin) {
+        printf("<func>");
+      } else {
+        printf("(\\ ");
+        lval_print(lv->args);
+        putchar(' ');
+        lval_print(lv->body);
+        putchar(')');
+      }
       break;
 
     case LVAL_NUM:
