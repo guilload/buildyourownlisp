@@ -3,10 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "builtins.h"
 #include "lval.h"
 
 
-lval* builtin_eval(lenv*, lval*);
 lval* lval_pop(lval*, int);
 
 
@@ -43,7 +43,7 @@ lval* lval_call(lenv* le, lval* func, lval* la) {
     return func->builtin(le, la);
   }
 
-  /* record argument counts */
+  /* save argument length */
   int provided = la->length;
   int expected = func->args->length;
 
@@ -63,19 +63,67 @@ lval* lval_call(lenv* le, lval* func, lval* la) {
     /* pop the first symbol from the args */
     lval* symbol = lval_pop(func->args, 0);
 
+    /* special case to deal with '&' */
+    if (strcmp(symbol->sym, "&") == 0) {
+
+      /* ensure '&' is followed by another symbol */
+      if (func->args->length != 1) {
+        lval_del(la);
+
+        return lval_err(
+          "Function format invalid. "
+          "Symbol '&' not followed by single symbol."
+        );
+      }
+
+      /* next arg should be bound to remaining arguments */
+      lval* nsymbol = lval_pop(func->args, 0);
+      lenv_put(func->env, nsymbol, builtin_list(le, la));
+
+      lval_del(symbol);
+      lval_del(nsymbol);
+      break;
+    }
+
     /* pop the next argument from the list */
     lval* value = lval_pop(la, 0);
 
     /* bind a copy into the function's environment */
     lenv_put(func->env, symbol, value);
 
-    /* Delete symbol and value */
+    /* delete symbol and value */
     lval_del(symbol);
     lval_del(value);
   }
 
-  /* Argument list is now bound so can be cleaned up */
+  /* argument list is now bound so can be cleaned up */
   lval_del(la);
+
+  /* if '&' remains in arg list bind to empty list */
+  if (func->args->length > 0 &&
+      strcmp(func->args->cell[0]->sym, "&") == 0) {
+
+    /* Check to ensure that & is not passed invalidly. */
+    if (func->args->length != 2) {
+      return lval_err(
+        "Function format invalid. "
+        "Symbol '&' not followed by single symbol."
+      );
+    }
+
+    /* pop and delete '&' symbol */
+    lval_del(lval_pop(func->args, 0));
+
+    /* pop next symbol and create empty list */
+    lval* symbol = lval_pop(func->args, 0);
+    lval* value = lval_qexpr();
+
+    /* bind to environment and delete */
+    lenv_put(func->env, symbol, value);
+
+    lval_del(symbol);
+    lval_del(value);
+  }
 
   /* If all args have been bound evaluate */
   if (func->args->length == 0) {
@@ -85,11 +133,14 @@ lval* lval_call(lenv* le, lval* func, lval* la) {
 
     /* Evaluate and return */
     return builtin_eval(
-      func->env, lval_add(lval_sexpr(), lval_copy(func->body)));
+      func->env,
+      lval_add(lval_sexpr(), lval_copy(func->body))
+    );
   } else {
     /* Otherwise return partially evaluated function */
     return lval_copy(func);
   }
+
 }
 
 /* copy a lval */
